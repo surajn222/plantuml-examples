@@ -1,0 +1,126 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+autonumber
+
+Participant Proto [
+    =Proto
+    ----
+    syntax = "proto3";
+    package echo;
+    option go_package = "./echo";
+
+    message Message {
+        string body = 1;
+    }
+
+    service EchoService {
+        rpc Echo(Message) returns (Message) {}
+    }
+
+]
+
+Participant Makefile [
+    =Makefile
+    ----
+    protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=.
+    --go-grpc_opt=paths=source_relative --proto_path=. echo/*.proto
+
+]
+
+
+Participant Build [
+    =Build
+    ----
+
+    type Message struct {
+    state         protoimpl.MessageState
+    sizeCache     protoimpl.SizeCache
+    unknownFields protoimpl.UnknownFields
+
+    Body string `protobuf:"bytes,1,opt,name=body,proto3" json:"body,omitempty"`
+    }
+
+    type EchoServiceClient interface {
+        Echo(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Message, error)
+    }
+
+    type echoServiceClient struct {
+        cc grpc.ClientConnInterface
+    }
+
+    func NewEchoServiceClient(cc grpc.ClientConnInterface) EchoServiceClient {
+        return &echoServiceClient{cc}
+    }
+
+    func (c *echoServiceClient) Echo(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Message, error) {
+        out := new(Message)
+        err := c.cc.Invoke(ctx, "/echo.EchoService/Echo", in, out, opts...)
+        if err != nil {
+            return nil, err
+        }
+        return out, nil
+    }
+
+    func RegisterEchoServiceServer(s grpc.ServiceRegistrar, srv EchoServiceServer) {
+	    s.RegisterService(&EchoService_ServiceDesc, srv)
+    }
+
+]
+
+
+Participant Server [
+    =Server
+    ----
+    listener, err := net.Listen("tcp", ":9001")
+    grpcServer := grpc.NewServer()
+    s := Server{}
+    proto.RegisterEchoServiceServer(grpcServer, &s)
+
+
+
+
+    type Server struct {pb.UnimplementedEchoServiceServer}
+
+    func (s *Server) mustEmbedUnimplementedEchoServiceServer() {}
+
+    func (s *Server) Echo(ctx context.Context, message *pb.Message) (*pb.Message, error) {
+	    fmt.Printf("Message recieved: %s", message.Body)
+	    return &pb.Message{Body: "Hi back 1!"}, nil
+    }
+]
+
+
+Participant Client [
+    =Client
+    ----
+
+
+
+
+
+
+
+
+    \t\t\t\t\t\t\t\t
+
+]
+
+Proto -> Makefile
+
+Makefile -> Build
+
+Client  -> Server: var conn *grpc.ClientConn; \t conn, err := grpc.Dial("localhost:9001", grpc.WithInsecure()) \t\t\t\t\t\t
+
+Client  -> Server: c := proto.NewEchoServiceClient(conn)
+
+Client  -> Server: 	resp, err := c.Echo(context.Background(), &message)
+
+Server -> Server: EchoService
+
+Server -> Server: EchoService.Echo(ctx context.Context, message *pb.Message) (*Message, error)
+
+Server  -> Client: return &pb.Message{Body: "Hi back 1!"}, nil
+
+Client -> Client: fmt.Printf("%s", resp.Body)
+
+@enduml

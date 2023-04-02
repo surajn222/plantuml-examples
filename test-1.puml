@@ -1,0 +1,5 @@
+@startuml
+
+[Another Component] --> [Example 1]
+
+@enduml
